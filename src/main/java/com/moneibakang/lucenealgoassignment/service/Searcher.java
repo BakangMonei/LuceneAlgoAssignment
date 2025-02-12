@@ -1,4 +1,4 @@
-package com.moneibakang.lucenealgoassignment.Service;
+package com.moneibakang.lucenealgoassignment.service;
 
 /*
  * @Author: Monei Bakang Mothuti
