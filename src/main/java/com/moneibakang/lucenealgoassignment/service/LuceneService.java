@@ -5,126 +5,156 @@ package com.moneibakang.lucenealgoassignment.service;
  * @Time: 0206 hours
  * @Date: 13/02/2025
  */
+
+import com.moneibakang.lucenealgoassignment.model.SetswanaEntry;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+//import lombok.Value;
+import org.springframework.beans.factory.annotation.Value;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
-import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+import java.io.*;
 import java.nio.file.Paths;
 import java.util.*;
 
+import org.apache.lucene.document.*;
+import org.apache.lucene.index.*;
+import org.apache.lucene.search.*;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+
+// Updated LuceneService.java
 @Service
 public class LuceneService {
+    private static final String INDEX_DIR = "lucene-index";
+    private final StandardAnalyzer analyzer;
+    private final Directory directory;
+    private final IndexWriter writer;
 
-    @Value("${lucene.index.path}")
-    private String indexPath;
+    @Value("${existing.file.path}")
+    private String existingFilePath;
 
-    @Value("${lucene.file.path}")
-    private String filePath;
+    public LuceneService() throws IOException {
+        analyzer = new StandardAnalyzer();
+        directory = FSDirectory.open(Paths.get(INDEX_DIR));
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        // Set to create a new index or overwrite existing one
+        config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+        writer = new IndexWriter(directory, config);
+    }
 
-    // Index the Setswana text file
-    public int indexFile() {
+    @PostConstruct
+    public void init() {
         try {
-            File indexDir = new File(indexPath);
-            if (!indexDir.exists()) indexDir.mkdirs();  // Create the directory if it doesn't exist
-
-            Directory directory = FSDirectory.open(Paths.get(indexPath));
-            StandardAnalyzer analyzer = new StandardAnalyzer();
-            IndexWriterConfig config = new IndexWriterConfig(analyzer);
-            IndexWriter writer = new IndexWriter(directory, config);
-
-            File file = new File(filePath);
-            BufferedReader br = new BufferedReader(new FileReader(file));
-            String line;
-            int lineNumber = 0;
-
-            while ((line = br.readLine()) != null) {
-                Document doc = new Document();
-                doc.add(new StringField("lineNumber", String.valueOf(lineNumber), Field.Store.YES));
-                doc.add(new TextField("content", line, Field.Store.YES));
-                writer.addDocument(doc);
-                lineNumber++;
-            }
-
-            br.close();
-            writer.close();
-            return lineNumber;
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return 0;
+            // Index the existing file on startup
+            indexExistingFile();
+        } catch (IOException e) {
+//            logger.error("Error indexing existing file: " + e.getMessage());
         }
     }
 
-    // Search for a word in the indexed data
-    public Map<String, Object> search(String queryStr) {
-        Map<String, Object> response = new HashMap<>();
-        List<Map<String, String>> resultsList = new ArrayList<>();
+    public void indexExistingFile() throws IOException {
+        File file = new File(existingFilePath);
+        if (file.exists()) {
+            indexFile(file.getAbsolutePath());
+        } else {
+            throw new FileNotFoundException("Existing file not found at: " + existingFilePath);
+        }
+    }
 
-        try {
-            Directory directory = FSDirectory.open(Paths.get(indexPath));
-            IndexReader reader = DirectoryReader.open(directory);
+    public void indexFile(String filePath) throws IOException {
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.trim().isEmpty()) continue;
+
+                String[] parts = line.split("\\|:");
+                if (parts.length >= 2) {
+                    String word = parts[0].trim();
+                    String[] remainingParts = parts[1].split(">>");
+                    String metadata = remainingParts[0];
+
+                    Document doc = new Document();
+                    // Store the word in both original and lowercase form for better searching
+                    doc.add(new TextField("word", word, Field.Store.YES));
+                    doc.add(new TextField("wordLower", word.toLowerCase(), Field.Store.YES));
+                    doc.add(new TextField("metadata", metadata, Field.Store.YES));
+
+                    // Add related words if they exist
+                    if (remainingParts.length > 1) {
+                        StringBuilder allRelated = new StringBuilder();
+                        for (int i = 1; i < remainingParts.length; i++) {
+                            String related = remainingParts[i].trim();
+                            doc.add(new TextField("related", related, Field.Store.YES));
+                            allRelated.append(related).append(" ");
+                        }
+                        // Add all related words in a single field for better searching
+                        doc.add(new TextField("allRelated", allRelated.toString(), Field.Store.NO));
+                    }
+
+                    writer.addDocument(doc);
+                }
+            }
+            writer.commit();
+        }
+    }
+
+    public List<SetswanaEntry> searchWord(String searchTerm) throws IOException {
+        List<SetswanaEntry> results = new ArrayList<>();
+
+        try (IndexReader reader = DirectoryReader.open(directory)) {
             IndexSearcher searcher = new IndexSearcher(reader);
 
-            StandardAnalyzer analyzer = new StandardAnalyzer();
-            QueryParser parser = new QueryParser("content", analyzer);
-            Query query = parser.parse(queryStr);
-            TopDocs results = searcher.search(query, 10);
+            // Create a boolean query to search in multiple fields
+            BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
 
-            response.put("query", queryStr);
-            response.put("total_results", results.totalHits.value);
+            // Search in word field (exact match)
+            queryBuilder.add(new TermQuery(new Term("word", searchTerm)), BooleanClause.Occur.SHOULD);
 
-            for (ScoreDoc sd : results.scoreDocs) {
+            // Search in lowercase word field
+            queryBuilder.add(new TermQuery(new Term("wordLower", searchTerm.toLowerCase())), BooleanClause.Occur.SHOULD);
+
+            // Search in related words
+            queryBuilder.add(new TermQuery(new Term("related", searchTerm)), BooleanClause.Occur.SHOULD);
+
+            TopDocs docs = searcher.search(queryBuilder.build(), 10);
+
+            for (ScoreDoc sd : docs.scoreDocs) {
                 Document doc = searcher.doc(sd.doc);
-                Map<String, String> result = new HashMap<>();
-                result.put("line", doc.get("lineNumber"));
-                result.put("text", doc.get("content"));
-                resultsList.add(result);
+                String word = doc.get("word");
+                String metadata = doc.get("metadata");
+                String[] related = doc.getValues("related");
+
+                results.add(new SetswanaEntry(word, metadata, related));
             }
-
-            response.put("results", resultsList);
-            reader.close();
-
-        } catch (Exception e) {
-            response.put("error", "Error during search: " + e.getMessage());
         }
 
-        return response;
+        return results;
     }
 
-    // Clear the index
-    public void clearIndex() {
-        try {
-            Directory directory = FSDirectory.open(Paths.get(indexPath));
-            IndexWriterConfig config = new IndexWriterConfig(new StandardAnalyzer());
-            IndexWriter writer = new IndexWriter(directory, config);
-            writer.deleteAll();
-            writer.commit();
-            writer.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    // Method to clear and rebuild index
+    public void rebuildIndex() throws IOException {
+        // Delete all documents
+        writer.deleteAll();
+        writer.commit();
+
+        // Reindex the existing file
+        indexExistingFile();
     }
 
-    // Get index statistics
-    public Map<String, Object> getIndexStats() {
-        Map<String, Object> stats = new HashMap<>();
-        try {
-            Directory directory = FSDirectory.open(Paths.get(indexPath));
-            IndexReader reader = DirectoryReader.open(directory);
-            stats.put("total_lines_indexed", reader.numDocs());
-            stats.put("index_size_bytes", directory.listAll().length);
-            reader.close();
-        } catch (Exception e) {
-            stats.put("error", "Failed to retrieve index stats: " + e.getMessage());
-        }
-        return stats;
+    // Clean up resources
+    @PreDestroy
+    public void close() throws IOException {
+        writer.close();
+        directory.close();
     }
 }
