@@ -126,7 +126,7 @@ public class LuceneService {
         return results;
     }
 
-    // ✅ Fuzzy Search (Handles typos and close matches)
+    // Fuzzy Search (Handles typos and close matches)
     public List<SetswanaEntry> fuzzySearch(String searchTerm) throws IOException {
         long startTime = System.nanoTime();
         List<SetswanaEntry> results = new ArrayList<>();
@@ -147,7 +147,7 @@ public class LuceneService {
         return results;
     }
 
-    // ✅ Prefix Search (Words starting with input)
+    // Prefix Search (Words starting with input)
     public List<SetswanaEntry> prefixSearch(String searchTerm) throws IOException {
         long startTime = System.nanoTime();
         List<SetswanaEntry> results = new ArrayList<>();
@@ -198,7 +198,6 @@ public class LuceneService {
         // Delete all documents
         writer.deleteAll();
         writer.commit();
-
         // Reindex the existing file
         indexExistingFile();
     }

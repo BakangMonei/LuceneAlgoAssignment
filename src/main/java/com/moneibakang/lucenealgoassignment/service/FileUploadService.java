@@ -1,6 +1,7 @@
 package com.moneibakang.lucenealgoassignment.service;
 
 //import lombok.Value;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -8,7 +9,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+
 import org.springframework.beans.factory.annotation.Value;
+
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 

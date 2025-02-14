@@ -23,7 +23,7 @@ public class SearchController {
     @Autowired
     private LuceneService luceneService;
 
-    // ✅ Rebuild Index with Time Measurement
+    // Rebuild Index with Time Measurement
     @PostMapping("/rebuild-index")
     public ResponseEntity<String> rebuildIndex() {
         long startTime = System.nanoTime(); // Start timer
@@ -38,7 +38,7 @@ public class SearchController {
         }
     }
 
-    // ✅ Standard Search by Word
+    // Standard Search by Word
     @GetMapping("/word/{term}")
     public ResponseEntity<List<SetswanaEntry>> searchWord(@PathVariable String term) {
         long startTime = System.nanoTime();
@@ -53,7 +53,7 @@ public class SearchController {
         }
     }
 
-    // ✅ Fuzzy Search (Handles Typos and Close Matches)
+    // Fuzzy Search (Handles Typos and Close Matches)
     @GetMapping("/fuzzy/{term}")
     public ResponseEntity<List<SetswanaEntry>> fuzzySearch(@PathVariable String term) {
         long startTime = System.nanoTime();
@@ -70,7 +70,7 @@ public class SearchController {
         }
     }
 
-    // ✅ Prefix Search (Words starting with input)
+    // Prefix Search (Words starting with input)
     @GetMapping("/prefix/{term}")
     public ResponseEntity<List<SetswanaEntry>> prefixSearch(@PathVariable String term) {
         long startTime = System.nanoTime();
