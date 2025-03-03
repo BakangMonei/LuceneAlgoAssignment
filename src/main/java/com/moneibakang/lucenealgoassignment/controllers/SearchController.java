@@ -29,8 +29,8 @@ public class SearchController {
         long startTime = System.nanoTime(); // Start timer
         try {
             luceneService.rebuildIndex();
-            long endTime = System.nanoTime(); // End timer
-            double duration = (endTime - startTime) / 1_000_000_000.0; // Convert to seconds
+            long endTime = System.nanoTime();
+            double duration = (endTime - startTime) / 1_000_000_000.0;
             return ResponseEntity.ok("Index rebuilt successfully in " + duration + " seconds");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

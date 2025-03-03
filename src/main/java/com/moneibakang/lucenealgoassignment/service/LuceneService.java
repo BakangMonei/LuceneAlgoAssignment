@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.*;
-import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
 import org.springframework.stereotype.Service;
@@ -32,7 +31,7 @@ public class LuceneService {
     @Value("${existing.file.path}")
     private String existingFilePath;
 
-    private static final int MAX_RESULTS = 10; // Limit search results
+    private static final int MAX_RESULTS = 10;
 
     public LuceneService() throws IOException {
         analyzer = new StandardAnalyzer();
@@ -195,10 +194,8 @@ public class LuceneService {
 
     // Method to clear and rebuild index
     public void rebuildIndex() throws IOException {
-        // Delete all documents
         writer.deleteAll();
         writer.commit();
-        // Reindex the existing file
         indexExistingFile();
     }
 }
